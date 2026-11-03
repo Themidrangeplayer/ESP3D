@@ -1297,6 +1297,7 @@ let fusionAngleX = 0;
 let fusionAngleY = 0;
 let fusionSensorAt = 0;
 let fallbackAccelX = 0;
+let fallbackAccelZ = 0;
 let fallbackAccelReady = false;
 
 function motionSupported() {
@@ -1313,6 +1314,7 @@ function recenterMotion() {
   fusionAngleY = 0;
   fusionSensorAt = 0;
   fallbackAccelX = 0;
+  fallbackAccelZ = 0;
   fallbackAccelReady = false;
   resetMotion();
   showFeedback('MOTION RECENTERED');
@@ -1354,75 +1356,38 @@ function handleMotion(event) {
   if (!motionEnabled) return;
 
   if (motionMode === 'motion') {
-    const rotation = event.rotationRate;
-    const hasRotation = rotation &&
-      Number.isFinite(rotation.beta) && Number.isFinite(rotation.gamma);
     const linear = event.acceleration;
     const hasLinearX = linear && Number.isFinite(linear.x);
-    const hasLinearY = linear && Number.isFinite(linear.y);
-    const sensorAt = Number.isFinite(event.timeStamp) && event.timeStamp > 0
-      ? event.timeStamp : performance.now();
+    const hasLinearZ = linear && Number.isFinite(linear.z);
     const gravity = event.accelerationIncludingGravity;
     const hasGravity = gravity && Number.isFinite(gravity.x) &&
       Number.isFinite(gravity.y) && Number.isFinite(gravity.z);
-    if (!hasRotation && !hasLinearX && !hasLinearY && !hasGravity) {
+    if (!hasLinearX && !hasLinearZ && !hasGravity) {
       motionNote.hidden = false;
       return;
     }
-    const dt = fusionSensorAt
-      ? Math.min(0.05, Math.max(0.001, (sensorAt - fusionSensorAt) / 1000))
-      : 0;
-    fusionSensorAt = sensorAt;
-
-    const gyroX = hasRotation && Math.abs(rotation.gamma) > GYRO_DEADZONE
-      ? -rotation.gamma : 0;
-    if (!dt) {
-      if (hasGravity) {
-        fusionAngleX = -Math.atan2(
-          gravity.x, Math.hypot(gravity.y, gravity.z)
-        ) * 180 / Math.PI;
-        fusionAngleY = -Math.atan2(
-          gravity.y, Math.hypot(gravity.x, gravity.z)
-        ) * 180 / Math.PI;
-      }
-      return;
-    }
-
-    fusionAngleX += gyroX * dt;
-    if (hasGravity) {
-      const accelX = -Math.atan2(
-        gravity.x, Math.hypot(gravity.y, gravity.z)
-      ) * 180 / Math.PI;
-      const accelY = -Math.atan2(
-        gravity.y, Math.hypot(gravity.x, gravity.z)
-      ) * 180 / Math.PI;
-      fusionAngleX += (accelX - fusionAngleX) * FUSION_ACCEL_WEIGHT;
-      fusionAngleY += (accelY - fusionAngleY) * FUSION_ACCEL_WEIGHT;
-    }
-
-    /* Gravity correction stabilizes the fused attitude state, but must not be
-       emitted as cursor motion: doing so makes the cursor return when the
-       phone is held at a new angle. */
-    /* Keep tilt out of the vertical axis: forward/backward translation is
-       represented by linear Y acceleration below. */
-    motionVelocityX += gyroX * GYRO_GAIN;
     let linearX = hasLinearX ? linear.x : 0;
-    if (!hasLinearX && hasGravity) {
+    let linearZ = hasLinearZ ? linear.z : 0;
+    if ((!hasLinearX || !hasLinearZ) && hasGravity) {
       if (!fallbackAccelReady) {
         fallbackAccelX = gravity.x;
+        fallbackAccelZ = gravity.z;
         fallbackAccelReady = true;
       }
-      linearX = gravity.x - fallbackAccelX;
+      if (!hasLinearX) linearX = gravity.x - fallbackAccelX;
+      if (!hasLinearZ) linearZ = gravity.z - fallbackAccelZ;
       fallbackAccelX += (gravity.x - fallbackAccelX) *
+        FALLBACK_ACCEL_BASELINE_WEIGHT;
+      fallbackAccelZ += (gravity.z - fallbackAccelZ) *
         FALLBACK_ACCEL_BASELINE_WEIGHT;
     }
     if (hasLinearX || fallbackAccelReady) {
       linearX = Math.abs(linearX) > MOTION_DEADZONE ? linearX : 0;
       motionVelocityX += linearX * FUSION_LINEAR_ACCEL_GAIN;
     }
-    if (hasLinearY) {
-      const linearY = Math.abs(linear.y) > MOTION_DEADZONE ? linear.y : 0;
-      motionVelocityY -= linearY * FUSION_LINEAR_ACCEL_GAIN;
+    if (hasLinearZ || fallbackAccelReady) {
+      linearZ = Math.abs(linearZ) > MOTION_DEADZONE ? linearZ : 0;
+      motionVelocityY -= linearZ * FUSION_LINEAR_ACCEL_GAIN;
     }
     return;
   }
