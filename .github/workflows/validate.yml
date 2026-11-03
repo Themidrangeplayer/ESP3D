@@ -1,0 +1,30 @@
+name: Validate
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  source-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate web source and embedded asset
+        run: |
+          python3 generate_web_header.py
+          node --check phone-app/js/app.js
+          git diff --exit-code -- firmware/esp32/ESP3D_Controller/web_ui.h
+
+      - name: Check generated and source files
+        run: git diff --check
