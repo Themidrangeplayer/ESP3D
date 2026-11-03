@@ -141,10 +141,7 @@ function sanitizeSettings(raw) {
   s.haptics = raw.haptics !== false;
   s.connectionAlerts = raw.connectionAlerts === true;
   s.virtualMouse = raw.virtualMouse === true;
-  s.motionMode =
-    raw.motionMode === 'accelerometer' || raw.motionMode === 'gyroscope'
-      ? raw.motionMode
-      : 'off';
+  s.motionMode = raw.motionMode === 'off' ? 'off' : 'motion';
   return s;
 }
 
@@ -848,7 +845,7 @@ function motionStep(now) {
 function handleMotion(event) {
   if (!motionEnabled) return;
 
-  if (motionMode === 'gyroscope') {
+  if (motionMode === 'motion') {
     const rotation = event.rotationRate;
     const hasRotation = rotation &&
       Number.isFinite(rotation.beta) && Number.isFinite(rotation.gamma);

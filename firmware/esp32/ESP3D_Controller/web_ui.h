@@ -95,8 +95,7 @@ const char INDEX_HTML[] PROGMEM = R"ESP3D(
       </div>
       <select id="motionMode">
         <option value="off">Off</option>
-        <option value="accelerometer">Accelerometer slide</option>
-        <option value="gyroscope">Gyroscope air mouse</option>
+        <option value="motion">Motion mouse</option>
       </select>
     </div>
 
@@ -652,10 +651,7 @@ function sanitizeSettings(raw) {
   s.haptics = raw.haptics !== false;
   s.connectionAlerts = raw.connectionAlerts === true;
   s.virtualMouse = raw.virtualMouse === true;
-  s.motionMode =
-    raw.motionMode === 'accelerometer' || raw.motionMode === 'gyroscope'
-      ? raw.motionMode
-      : 'off';
+  s.motionMode = raw.motionMode === 'off' ? 'off' : 'motion';
   return s;
 }
 
@@ -1359,7 +1355,7 @@ function motionStep(now) {
 function handleMotion(event) {
   if (!motionEnabled) return;
 
-  if (motionMode === 'gyroscope') {
+  if (motionMode === 'motion') {
     const rotation = event.rotationRate;
     const hasRotation = rotation &&
       Number.isFinite(rotation.beta) && Number.isFinite(rotation.gamma);
