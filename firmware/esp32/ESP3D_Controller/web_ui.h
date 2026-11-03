@@ -1354,9 +1354,9 @@ function handleMotion(event) {
     }
 
     const x = Math.abs(rotation.gamma) > GYRO_DEADZONE
-      ? rotation.gamma * GYRO_GAIN : 0;
+      ? -rotation.gamma * GYRO_GAIN : 0;
     const y = Math.abs(rotation.beta) > GYRO_DEADZONE
-      ? rotation.beta * GYRO_GAIN : 0;
+      ? -rotation.beta * GYRO_GAIN : 0;
     motionVelocityX += x;
     motionVelocityY += y;
     return;
