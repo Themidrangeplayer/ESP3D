@@ -70,20 +70,20 @@ const CLICK_HOLD_MS = 24;       /* guarantees one BLE report sees the press */
 const HOLD_DRAG_MS = 400;         /* hold this long to latch the left button */
 const HOLD_DRAG_MAX_MOVE_PX = 6;
 
-const SCROLL_START_PX = 6;
-const SCROLL_GAIN = 0.025;      /* wheel units per px of two-finger travel */
+const SCROLL_START_PX = 3;
+const SCROLL_GAIN = 0.035;      /* wheel units per px of two-finger travel */
 const MAX_SCROLL_PER_MSG = 127;
 const HORIZONTAL_SCROLL_ENABLED = false;
 
 /* Inertial scrolling after the fingers lift, similar to a MacBook trackpad.
    Velocity is measured in finger px per ms; it decays exponentially and the
    normal scroll gain converts it to wheel units. */
-const MOMENTUM_SAMPLE_MS = 90;       /* velocity window before release */
-const MOMENTUM_MIN_START = 0.06;     /* px/ms — below this, no coast */
+const MOMENTUM_SAMPLE_MS = 75;       /* velocity window before release */
+const MOMENTUM_MIN_START = 0.04;     /* px/ms — below this, no coast */
 const MOMENTUM_MAX_UNITS_PER_MS = 0.1; /* 100 ticks/s, below the HID drain rate */
-const MOMENTUM_TAU_MS = 400;         /* exponential decay time constant */
-const MOMENTUM_STOP_V = 0.015;       /* px/ms — end of the coast */
-const MOMENTUM_MAX_MS = 2600;
+const MOMENTUM_TAU_MS = 320;         /* exponential decay time constant */
+const MOMENTUM_STOP_V = 0.01;        /* px/ms — end of the coast */
+const MOMENTUM_MAX_MS = 2200;
 
 /* Link latency probe (round trip to the ESP32 over Wi-Fi). */
 const PING_INTERVAL_MS = 1500;
