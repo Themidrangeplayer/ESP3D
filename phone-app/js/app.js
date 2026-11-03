@@ -777,6 +777,7 @@ const MOTION_GAIN = 145;
 const GYRO_DEADZONE = 1.5;
 const GYRO_GAIN = 5.5;
 const FUSION_ACCEL_WEIGHT = 0.02;
+const FUSION_LINEAR_ACCEL_GAIN = 110;
 let motionEnabled = false;
 let motionMode = 'off';
 let motionFrame = 0;
@@ -842,10 +843,12 @@ function handleMotion(event) {
 
   if (motionMode === 'gyroscope') {
     const rotation = event.rotationRate;
-    if (!rotation ||
-        !Number.isFinite(rotation.alpha) ||
-        !Number.isFinite(rotation.beta) ||
-        !Number.isFinite(rotation.gamma)) {
+    const hasRotation = rotation &&
+      Number.isFinite(rotation.beta) && Number.isFinite(rotation.gamma);
+    const linear = event.acceleration;
+    const hasLinearAcceleration = linear &&
+      Number.isFinite(linear.x) && Number.isFinite(linear.y);
+    if (!hasRotation && !hasLinearAcceleration) {
       motionNote.hidden = false;
       return;
     }
@@ -860,9 +863,9 @@ function handleMotion(event) {
       : 0;
     fusionSensorAt = sensorAt;
 
-    const gyroX = Math.abs(rotation.gamma) > GYRO_DEADZONE
+    const gyroX = hasRotation && Math.abs(rotation.gamma) > GYRO_DEADZONE
       ? -rotation.gamma : 0;
-    const gyroY = Math.abs(rotation.beta) > GYRO_DEADZONE
+    const gyroY = hasRotation && Math.abs(rotation.beta) > GYRO_DEADZONE
       ? -rotation.beta : 0;
 
     if (!dt) {
@@ -897,6 +900,12 @@ function handleMotion(event) {
     const y = ((fusionAngleY - previousAngleY) / dt) * GYRO_GAIN;
     motionVelocityX += x;
     motionVelocityY += y;
+    if (hasLinearAcceleration) {
+      const linearX = Math.abs(linear.x) > MOTION_DEADZONE ? linear.x : 0;
+      const linearY = Math.abs(linear.y) > MOTION_DEADZONE ? linear.y : 0;
+      motionVelocityX += linearX * FUSION_LINEAR_ACCEL_GAIN;
+      motionVelocityY -= linearY * FUSION_LINEAR_ACCEL_GAIN;
+    }
     return;
   }
 
