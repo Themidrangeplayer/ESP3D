@@ -778,6 +778,7 @@ const GYRO_DEADZONE = 1.5;
 const GYRO_GAIN = 5.5;
 const FUSION_ACCEL_WEIGHT = 0.02;
 const FUSION_LINEAR_ACCEL_GAIN = 110;
+const FALLBACK_ACCEL_BASELINE_WEIGHT = 0.12;
 let motionEnabled = false;
 let motionMode = 'off';
 let motionFrame = 0;
@@ -788,6 +789,9 @@ let motionPermissionPending = false;
 let fusionAngleX = 0;
 let fusionAngleY = 0;
 let fusionSensorAt = 0;
+let fallbackAccelX = 0;
+let fallbackAccelY = 0;
+let fallbackAccelReady = false;
 
 function motionSupported() {
   return window.isSecureContext &&
@@ -802,6 +806,9 @@ function recenterMotion() {
   fusionAngleX = 0;
   fusionAngleY = 0;
   fusionSensorAt = 0;
+  fallbackAccelX = 0;
+  fallbackAccelY = 0;
+  fallbackAccelReady = false;
   resetMotion();
   showFeedback('MOTION RECENTERED');
 }
@@ -848,16 +855,15 @@ function handleMotion(event) {
     const linear = event.acceleration;
     const hasLinearAcceleration = linear &&
       Number.isFinite(linear.x) && Number.isFinite(linear.y);
-    if (!hasRotation && !hasLinearAcceleration) {
-      motionNote.hidden = false;
-      return;
-    }
-
     const sensorAt = Number.isFinite(event.timeStamp) && event.timeStamp > 0
       ? event.timeStamp : performance.now();
     const gravity = event.accelerationIncludingGravity;
     const hasGravity = gravity && Number.isFinite(gravity.x) &&
       Number.isFinite(gravity.y) && Number.isFinite(gravity.z);
+    if (!hasRotation && !hasLinearAcceleration && !hasGravity) {
+      motionNote.hidden = false;
+      return;
+    }
     const dt = fusionSensorAt
       ? Math.min(0.05, Math.max(0.001, (sensorAt - fusionSensorAt) / 1000))
       : 0;
@@ -899,9 +905,24 @@ function handleMotion(event) {
        phone is held at a new angle. */
     motionVelocityX += gyroX * GYRO_GAIN;
     motionVelocityY += gyroY * GYRO_GAIN;
-    if (hasLinearAcceleration) {
-      const linearX = Math.abs(linear.x) > MOTION_DEADZONE ? linear.x : 0;
-      const linearY = Math.abs(linear.y) > MOTION_DEADZONE ? linear.y : 0;
+    let linearX = hasLinearAcceleration ? linear.x : 0;
+    let linearY = hasLinearAcceleration ? linear.y : 0;
+    if (!hasLinearAcceleration && hasGravity) {
+      if (!fallbackAccelReady) {
+        fallbackAccelX = gravity.x;
+        fallbackAccelY = gravity.y;
+        fallbackAccelReady = true;
+      }
+      linearX = gravity.x - fallbackAccelX;
+      linearY = gravity.y - fallbackAccelY;
+      fallbackAccelX += (gravity.x - fallbackAccelX) *
+        FALLBACK_ACCEL_BASELINE_WEIGHT;
+      fallbackAccelY += (gravity.y - fallbackAccelY) *
+        FALLBACK_ACCEL_BASELINE_WEIGHT;
+    }
+    if (hasLinearAcceleration || fallbackAccelReady) {
+      linearX = Math.abs(linearX) > MOTION_DEADZONE ? linearX : 0;
+      linearY = Math.abs(linearY) > MOTION_DEADZONE ? linearY : 0;
       motionVelocityX += linearX * FUSION_LINEAR_ACCEL_GAIN;
       motionVelocityY -= linearY * FUSION_LINEAR_ACCEL_GAIN;
     }
