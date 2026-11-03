@@ -1391,8 +1391,6 @@ function handleMotion(event) {
       return;
     }
 
-    const previousAngleX = fusionAngleX;
-    const previousAngleY = fusionAngleY;
     fusionAngleX += gyroX * dt;
     fusionAngleY += gyroY * dt;
 
@@ -1407,10 +1405,11 @@ function handleMotion(event) {
       fusionAngleY += (accelY - fusionAngleY) * FUSION_ACCEL_WEIGHT;
     }
 
-    const x = ((fusionAngleX - previousAngleX) / dt) * GYRO_GAIN;
-    const y = ((fusionAngleY - previousAngleY) / dt) * GYRO_GAIN;
-    motionVelocityX += x;
-    motionVelocityY += y;
+    /* Gravity correction stabilizes the fused attitude state, but must not be
+       emitted as cursor motion: doing so makes the cursor return when the
+       phone is held at a new angle. */
+    motionVelocityX += gyroX * GYRO_GAIN;
+    motionVelocityY += gyroY * GYRO_GAIN;
     if (hasLinearAcceleration) {
       const linearX = Math.abs(linear.x) > MOTION_DEADZONE ? linear.x : 0;
       const linearY = Math.abs(linear.y) > MOTION_DEADZONE ? linear.y : 0;
