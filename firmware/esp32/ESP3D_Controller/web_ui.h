@@ -542,7 +542,7 @@ const HEARTBEAT_MS = 30;
    deltas, so there is no need to pace the phone below the BLE report rate —
    waiting on a timer here only added input latency. */
 const BACKPRESSURE_RETRY_MS = 16;
-const MOVE_BATCH_MS = 2;
+const MOVE_BATCH_MS = 1;
 const MAX_MOVE_PER_MSG = 30000;   /* safety clamp; firmware chunks to ±127 */
 const BACKPRESSURE_LIMIT = 2048;
 const STALE_INPUT_MS = 180;

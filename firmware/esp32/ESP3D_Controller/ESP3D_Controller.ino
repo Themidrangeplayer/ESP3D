@@ -19,7 +19,7 @@ uint32_t lastButtonActivity = 0;
 const uint32_t BUTTON_TIMEOUT_MS = 10000;
 
 /* The HID library's move() replaces its pending report delta. Movement is
-   therefore drained once per matching 7 ms report interval, rather than
+   therefore drained once per matching 8 ms report interval, rather than
    immediately on WebSocket arrival. This prevents a second write from
    overwriting the report task's pending delta and keeps delivery cadence
    stable. */
@@ -28,7 +28,7 @@ int32_t pendingMoveY = 0;
 
 uint32_t lastMoveDrain = 0;
 
-const uint32_t MOVE_DRAIN_MS = 10;   /* matches HIDRate::Hz100 */
+const uint32_t MOVE_DRAIN_MS = 8;    /* matches HIDRate::Hz125 */
 const int32_t MOVE_ACCUM_LIMIT = 2000;
 
 /* Delivery diagnostics.
@@ -465,7 +465,7 @@ void setup() {
   httpServer.begin();
 
   mouse.setLogLevel(HIDLogLevel::Normal);
-  mouse.setUpdateRate(HIDRate::Hz100);
+  mouse.setUpdateRate(HIDRate::Hz125);
   mouse.begin();
 
   webSocket.begin();
