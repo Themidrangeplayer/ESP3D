@@ -28,11 +28,6 @@ const pad = document.getElementById('pad');
 const padFeedback = document.getElementById('padFeedback');
 const virtualButtons = document.getElementById('virtualButtons');
 const virtualMouseInput = document.getElementById('virtualMouse');
-const motionModeInput = document.getElementById('motionMode');
-const recenterMotionButton = document.getElementById('recenterMotion');
-const motionPermissionButton = document.getElementById('motionPermission');
-const motionNote = document.getElementById('motionNote');
-
 const sensitivityInput = document.getElementById('sensitivity');
 const sensitivityValue = document.getElementById('sensitivityValue');
 const scrollSensitivityInput = document.getElementById('scrollSensitivity');
@@ -115,7 +110,6 @@ const DEFAULT_SETTINGS = {
   hapticIntensity: 1,
   connectionAlerts: false,
   virtualMouse: false,
-  motionMode: 'off',
 };
 
 let settings = { ...DEFAULT_SETTINGS };
@@ -141,7 +135,6 @@ function sanitizeSettings(raw) {
   s.haptics = raw.haptics !== false;
   s.connectionAlerts = raw.connectionAlerts === true;
   s.virtualMouse = raw.virtualMouse === true;
-  s.motionMode = raw.motionMode === 'off' ? 'off' : 'motion';
   return s;
 }
 
@@ -766,154 +759,6 @@ function releaseAllButtons(trySend) {
 
 const virtualButtonPointers = new Map();
 
-/* ------------------------- accelerometer mouse ------------------------- */
-
-const MOTION_DEADZONE = 0.18;
-const MOTION_DAMPING = 0.86;
-const ACCELERATION_GAIN = 110;
-const FALLBACK_ACCEL_BASELINE_WEIGHT = 0.12;
-let motionEnabled = false;
-let motionMode = 'off';
-let motionFrame = 0;
-let motionLastAt = 0;
-let motionVelocityX = 0;
-let motionVelocityY = 0;
-let motionPermissionPending = false;
-let fallbackAccelX = 0;
-let fallbackAccelZ = 0;
-let fallbackAccelReady = false;
-
-function motionSupported() {
-  return window.isSecureContext &&
-    (typeof window.DeviceMotionEvent === 'function' ||
-      typeof window.DeviceMotionEvent === 'object');
-}
-
-function recenterMotion() {
-  motionVelocityX = 0;
-  motionVelocityY = 0;
-  motionLastAt = 0;
-  fallbackAccelX = 0;
-  fallbackAccelZ = 0;
-  fallbackAccelReady = false;
-  resetMotion();
-  showFeedback('MOTION RECENTERED');
-}
-
-function stopMotionMouse() {
-  motionEnabled = false;
-  if (motionFrame) {
-    cancelAnimationFrame(motionFrame);
-    motionFrame = 0;
-  }
-  window.removeEventListener('devicemotion', handleMotion);
-  recenterMotion();
-  motionPermissionButton.hidden = true;
-  pad.classList.remove('motion-active');
-}
-
-function motionStep(now) {
-  motionFrame = 0;
-  if (!motionEnabled) return;
-
-  if (motionLastAt) {
-    const dt = Math.min(40, Math.max(1, now - motionLastAt)) / 1000;
-    motionVelocityX *= Math.pow(MOTION_DAMPING, dt * 60);
-    motionVelocityY *= Math.pow(MOTION_DAMPING, dt * 60);
-
-    const dx = motionVelocityX * dt * settings.sensitivity;
-    const dy = motionVelocityY * dt * settings.sensitivity;
-    if (Math.abs(dx) >= 0.01 || Math.abs(dy) >= 0.01) {
-      accumulateMove(dx, dy);
-    }
-  }
-
-  motionLastAt = now;
-  motionFrame = requestAnimationFrame(motionStep);
-}
-
-function handleMotion(event) {
-  if (!motionEnabled) return;
-
-  if (motionMode === 'motion') {
-    const linear = event.acceleration;
-    const hasLinearX = linear && Number.isFinite(linear.x);
-    const hasLinearZ = linear && Number.isFinite(linear.z);
-    const gravity = event.accelerationIncludingGravity;
-    const hasGravity = gravity && Number.isFinite(gravity.x) &&
-      Number.isFinite(gravity.y) && Number.isFinite(gravity.z);
-    if (!hasLinearX && !hasLinearZ && !hasGravity) {
-      motionNote.hidden = false;
-      return;
-    }
-    let linearX = hasLinearX ? linear.x : 0;
-    let linearZ = hasLinearZ ? linear.z : 0;
-    if ((!hasLinearX || !hasLinearZ) && hasGravity) {
-      if (!fallbackAccelReady) {
-        fallbackAccelX = gravity.x;
-        fallbackAccelZ = gravity.z;
-        fallbackAccelReady = true;
-      }
-      if (!hasLinearX) linearX = gravity.x - fallbackAccelX;
-      if (!hasLinearZ) linearZ = gravity.z - fallbackAccelZ;
-      fallbackAccelX += (gravity.x - fallbackAccelX) *
-        FALLBACK_ACCEL_BASELINE_WEIGHT;
-      fallbackAccelZ += (gravity.z - fallbackAccelZ) *
-        FALLBACK_ACCEL_BASELINE_WEIGHT;
-    }
-    if (hasLinearX || fallbackAccelReady) {
-      linearX = Math.abs(linearX) > MOTION_DEADZONE ? linearX : 0;
-      motionVelocityX += linearX * ACCELERATION_GAIN;
-    }
-    if (hasLinearZ || fallbackAccelReady) {
-      linearZ = Math.abs(linearZ) > MOTION_DEADZONE ? linearZ : 0;
-      motionVelocityY -= linearZ * ACCELERATION_GAIN;
-    }
-    return;
-  }
-}
-
-async function startMotionMouse() {
-  if (!motionSupported()) {
-    motionNote.hidden = false;
-    motionPermissionButton.hidden = true;
-    return;
-  }
-
-  if (
-    typeof window.DeviceMotionEvent.requestPermission === 'function' &&
-    !motionPermissionPending
-  ) {
-    motionPermissionPending = true;
-    try {
-      const permission = await window.DeviceMotionEvent.requestPermission();
-      if (permission !== 'granted') throw new Error('Motion permission denied');
-    } catch (error) {
-      motionNote.hidden = false;
-      motionPermissionButton.hidden = false;
-      return;
-    } finally {
-      motionPermissionPending = false;
-    }
-  }
-
-  motionNote.hidden = true;
-  motionPermissionButton.hidden = true;
-  motionEnabled = true;
-  recenterMotionButton.hidden = false;
-  pad.classList.add('motion-active');
-  window.addEventListener('devicemotion', handleMotion);
-  motionFrame = requestAnimationFrame(motionStep);
-  showFeedback('MOTION MOUSE');
-}
-
-function setMotionMode(mode) {
-  stopMotionMouse();
-  motionMode = mode;
-  if (mode !== 'off') startMotionMouse();
-  else recenterMotionButton.hidden = true;
-}
-
 function releaseVirtualButton(pointerId) {
   const code = virtualButtonPointers.get(pointerId);
   if (!code) return;
@@ -1393,9 +1238,6 @@ function applySettingsToControls() {
   connectionAlertsInput.checked = settings.connectionAlerts;
   virtualMouseInput.checked = settings.virtualMouse;
   virtualButtons.hidden = !settings.virtualMouse;
-  motionModeInput.value = settings.motionMode;
-  recenterMotionButton.hidden = settings.motionMode === 'off';
-
   hapticIntensityInput.disabled = !settings.haptics;
   hapticTestButton.disabled = !settings.haptics || !hapticsSupported;
 
@@ -1455,17 +1297,6 @@ function initSettings() {
     virtualButtons.hidden = !settings.virtualMouse;
     if (!settings.virtualMouse) releaseAllButtons(true);
     saveSettings();
-  });
-
-  motionModeInput.addEventListener('change', () => {
-    settings.motionMode = motionModeInput.value;
-    saveSettings();
-    setMotionMode(settings.motionMode);
-  });
-
-  recenterMotionButton.addEventListener('click', recenterMotion);
-  motionPermissionButton.addEventListener('click', () => {
-    if (motionMode !== 'off') startMotionMouse();
   });
 
   hapticTestButton.addEventListener('click', () => {

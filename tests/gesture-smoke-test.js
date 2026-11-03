@@ -42,7 +42,6 @@ class FakeEl {
 const ids = [
   'phoneStatus', 'bleStatus', 'pad', 'padFeedback',
   'virtualButtons', 'virtualMouse',
-  'motionMode', 'recenterMotion', 'motionPermission', 'motionNote',
   'sensitivity', 'sensitivityValue', 'scrollSensitivity',
   'scrollSensitivityValue', 'naturalScroll', 'hapticsEnabled',
   'hapticIntensity', 'hapticIntensityValue', 'connectionAlerts',
@@ -62,7 +61,6 @@ const document = {
 };
 const windowListeners = new Map();
 const window = {
-  DeviceMotionEvent: undefined,
   isSecureContext: false,
   addEventListener: (type, fn) => {
     if (!windowListeners.has(type)) windowListeners.set(type, []);
