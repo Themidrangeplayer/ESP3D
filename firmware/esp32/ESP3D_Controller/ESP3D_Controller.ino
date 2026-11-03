@@ -28,8 +28,8 @@ int32_t pendingMoveY = 0;
 
 const uint32_t MOVE_DRAIN_MS = 8;    /* matches HIDRate::Hz125 */
 const int32_t MOVE_ACCUM_LIMIT = 2000;
-const UBaseType_t MOVEMENT_TASK_PRIORITY = 4;
-const UBaseType_t SERVICE_TASK_PRIORITY = 2;
+const UBaseType_t MOVEMENT_TASK_PRIORITY = configMAX_PRIORITIES - 1;
+const UBaseType_t SERVICE_TASK_PRIORITY = 1;
 portMUX_TYPE movementMux = portMUX_INITIALIZER_UNLOCKED;
 TaskHandle_t movementTaskHandle = nullptr;
 TaskHandle_t serviceTaskHandle = nullptr;
