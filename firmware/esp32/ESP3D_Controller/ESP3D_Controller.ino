@@ -29,7 +29,9 @@ int32_t pendingMoveY = 0;
 uint32_t lastMoveDrain = 0;
 
 const uint32_t MOVE_DRAIN_MS = 8;    /* matches HIDRate::Hz125 */
-const int32_t MOVE_ACCUM_LIMIT = 2000;
+/* Keep at most four HID reports queued. A larger queue replays stale motion
+   after a fast swipe and feels like lag, even though no packets are lost. */
+const int32_t MOVE_ACCUM_LIMIT = 508;
 
 /* Delivery diagnostics.
 
