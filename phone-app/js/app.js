@@ -770,11 +770,7 @@ const virtualButtonPointers = new Map();
 
 const MOTION_DEADZONE = 0.18;
 const MOTION_DAMPING = 0.86;
-const MOTION_GAIN = 145;
-const GYRO_DEADZONE = 1.5;
-const GYRO_GAIN = 5.5;
-const FUSION_ACCEL_WEIGHT = 0.02;
-const FUSION_LINEAR_ACCEL_GAIN = 110;
+const ACCELERATION_GAIN = 110;
 const FALLBACK_ACCEL_BASELINE_WEIGHT = 0.12;
 let motionEnabled = false;
 let motionMode = 'off';
@@ -783,9 +779,6 @@ let motionLastAt = 0;
 let motionVelocityX = 0;
 let motionVelocityY = 0;
 let motionPermissionPending = false;
-let fusionAngleX = 0;
-let fusionAngleY = 0;
-let fusionSensorAt = 0;
 let fallbackAccelX = 0;
 let fallbackAccelZ = 0;
 let fallbackAccelReady = false;
@@ -800,9 +793,6 @@ function recenterMotion() {
   motionVelocityX = 0;
   motionVelocityY = 0;
   motionLastAt = 0;
-  fusionAngleX = 0;
-  fusionAngleY = 0;
-  fusionSensorAt = 0;
   fallbackAccelX = 0;
   fallbackAccelZ = 0;
   fallbackAccelReady = false;
@@ -873,29 +863,14 @@ function handleMotion(event) {
     }
     if (hasLinearX || fallbackAccelReady) {
       linearX = Math.abs(linearX) > MOTION_DEADZONE ? linearX : 0;
-      motionVelocityX += linearX * FUSION_LINEAR_ACCEL_GAIN;
+      motionVelocityX += linearX * ACCELERATION_GAIN;
     }
     if (hasLinearZ || fallbackAccelReady) {
       linearZ = Math.abs(linearZ) > MOTION_DEADZONE ? linearZ : 0;
-      motionVelocityY -= linearZ * FUSION_LINEAR_ACCEL_GAIN;
+      motionVelocityY -= linearZ * ACCELERATION_GAIN;
     }
     return;
   }
-
-  const acceleration = event.acceleration;
-  if (!acceleration || !Number.isFinite(acceleration.x) ||
-      !Number.isFinite(acceleration.y)) {
-    motionNote.hidden = false;
-    return;
-  }
-
-  const x = Math.abs(acceleration.x) > MOTION_DEADZONE
-    ? acceleration.x : 0;
-  const y = Math.abs(acceleration.y) > MOTION_DEADZONE
-    ? acceleration.y : 0;
-
-  motionVelocityX += x * MOTION_GAIN;
-  motionVelocityY -= y * MOTION_GAIN;
 }
 
 async function startMotionMouse() {
