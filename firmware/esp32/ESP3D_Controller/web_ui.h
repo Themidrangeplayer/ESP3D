@@ -750,7 +750,7 @@ function socketUrl() {
   const host = location.hostname;
   const local =
     !host || host === 'localhost' || host === '127.0.0.1' || host === '::1';
-  return `wss://${local ? '192.168.4.1' : host}/`;
+  return `ws://${local ? '192.168.4.1' : host}:${WS_PORT}/`;
 }
 
 function setPhoneState(state, text) {
