@@ -995,7 +995,7 @@ pad.addEventListener('pointerdown', event => {
   }
 });
 
-function handlePointerMove(event) {
+function processPointerMove(event) {
   const pointer = padPointers.get(event.pointerId);
   if (!pointer) return;
 
@@ -1121,10 +1121,24 @@ function handlePointerMove(event) {
   }
 }
 
+function handlePointerMove(event) {
+  event.preventDefault();
+  const samples =
+    typeof event.getCoalescedEvents === 'function'
+      ? event.getCoalescedEvents()
+      : [];
+
+  if (samples.length > 0) {
+    for (const sample of samples) processPointerMove(sample);
+  } else {
+    processPointerMove(event);
+  }
+}
+
 /* Chrome can deliver raw touch samples before they are coalesced into a
-   frame, cutting up to one display frame of input latency. Both handlers use
-   the same code path: movement is the difference from the last stored
-   position, so a duplicate delivery contributes zero. */
+   frame, cutting up to one display frame of input latency. Coalesced samples
+   are replayed in order, while both handlers use the same path and duplicate
+   positions still contribute zero. */
 pad.addEventListener('pointermove', handlePointerMove);
 
 if ('onpointerrawupdate' in pad) {
