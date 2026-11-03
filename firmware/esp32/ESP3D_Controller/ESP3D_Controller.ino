@@ -30,6 +30,7 @@ const uint32_t MOVE_DRAIN_MS = 8;    /* matches HIDRate::Hz125 */
 const int32_t MOVE_ACCUM_LIMIT = 2000;
 portMUX_TYPE movementMux = portMUX_INITIALIZER_UNLOCKED;
 TaskHandle_t movementTaskHandle = nullptr;
+TaskHandle_t serviceTaskHandle = nullptr;
 
 /* Delivery diagnostics.
 
@@ -425,6 +426,34 @@ void handleWebSocket(uint8_t client, WStype_t type,
   }
 }
 
+void serviceTask(void*) {
+  for (;;) {
+    /* Keep all network-server calls and their callbacks on one task. The
+       movement task only touches the protected motion queue and HID output. */
+    webSocket.loop();
+    httpServer.handleClient();
+
+    uint32_t now = millis();
+
+    if (lastLoopAt != 0) {
+      uint32_t stall = now - lastLoopAt;
+      if (stall > loopMaxMs) loopMaxMs = stall;
+    }
+    lastLoopAt = now;
+
+    keepBleLinkActive(now);
+    pushBleStatus(now);
+    updateStatusLed(now);
+
+    if (heldButtons != 0 &&
+        now - lastButtonActivity >= BUTTON_TIMEOUT_MS) {
+      releaseAllButtons();
+    }
+
+    vTaskDelay(pdMS_TO_TICKS(1));
+  }
+}
+
 void disableHttpCache() {
   httpServer.sendHeader(
     "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0"
@@ -509,6 +538,16 @@ void setup() {
   webSocket.begin();
   webSocket.onEvent(handleWebSocket);
 
+  xTaskCreatePinnedToCore(
+    serviceTask,
+    "network-service",
+    6144,
+    nullptr,
+    2,
+    &serviceTaskHandle,
+    0
+  );
+
   Serial.println("ESP3D ready");
   Serial.println("Wi-Fi: ESP3D_Controller");
   Serial.println("Password: ESP3D-1234");
@@ -516,28 +555,7 @@ void setup() {
 }
 
 void loop() {
-  /* Serve the input socket before HTTP: a status request must never sit in
-     front of a movement packet. The page no longer polls HTTP at all; the
-     endpoint is kept for manual diagnostics. */
-  webSocket.loop();
-  httpServer.handleClient();
-
-  uint32_t now = millis();
-
-  if (lastLoopAt != 0) {
-    uint32_t stall = now - lastLoopAt;
-    if (stall > loopMaxMs) loopMaxMs = stall;
-  }
-  lastLoopAt = now;
-
-  keepBleLinkActive(now);
-  pushBleStatus(now);
-  updateStatusLed(now);
-
-  if (heldButtons != 0 &&
-      millis() - lastButtonActivity >= BUTTON_TIMEOUT_MS) {
-    releaseAllButtons();
-  }
-
-  delay(1);
+  /* Input, networking, and maintenance are handled by dedicated RTOS tasks.
+     Keep the Arduino loop yielding for compatibility with the framework. */
+  vTaskDelay(pdMS_TO_TICKS(1000));
 }
