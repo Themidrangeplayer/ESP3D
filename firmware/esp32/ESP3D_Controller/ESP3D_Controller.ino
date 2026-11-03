@@ -34,20 +34,6 @@ portMUX_TYPE movementMux = portMUX_INITIALIZER_UNLOCKED;
 TaskHandle_t movementTaskHandle = nullptr;
 TaskHandle_t serviceTaskHandle = nullptr;
 
-/* Delivery diagnostics.
-
-   The phone sends K <seq> at a fixed 30 ms cadence. The gap between two K
-   packets seen here therefore measures the phone timer plus the whole Wi-Fi
-   path. loopMaxMs records the longest stall of this main loop, which catches
-   HTTP or BLE stack blocking. Both are reported in the P reply and reset on
-   every probe, so the phone can show the worst case since the previous one. */
-uint32_t lastHeartbeatAt = 0;
-uint32_t heartbeatGapSum = 0;
-uint32_t heartbeatGapMax = 0;
-uint32_t heartbeatCount = 0;
-uint32_t lastLoopAt = 0;
-uint32_t loopMaxMs = 0;
-
 int lastBleState = -1;
 
 /* The library refreshes its idle timer on addScroll(), and after 5 s without
@@ -191,19 +177,6 @@ void clearPendingInput() {
   portEXIT_CRITICAL(&movementMux);
 }
 
-void noteHeartbeat(uint32_t now) {
-  if (lastHeartbeatAt != 0) {
-    uint32_t gap = now - lastHeartbeatAt;
-    /* Ignore a gap across a page reload or a suspended phone. */
-    if (gap < 5000) {
-      heartbeatGapSum += gap;
-      if (gap > heartbeatGapMax) heartbeatGapMax = gap;
-      heartbeatCount++;
-    }
-  }
-  lastHeartbeatAt = now;
-}
-
 void pushBleStatus(uint32_t now, int client = -1) {
   (void)now;
   int state = mouse.isConnected() ? 1 : 0;
@@ -275,20 +248,12 @@ void queueMovement(int32_t dx, int32_t dy) {
   portEXIT_CRITICAL(&movementMux);
 }
 
-void movementBacklog(int32_t& x, int32_t& y) {
-  portENTER_CRITICAL(&movementMux);
-  x = pendingMoveX;
-  y = pendingMoveY;
-  portEXIT_CRITICAL(&movementMux);
-}
-
 void handleWebSocket(uint8_t client, WStype_t type,
                      uint8_t* payload, size_t length) {
 
   if (type == WStype_DISCONNECTED) {
     releaseAllButtons();
     clearPendingInput();
-    lastHeartbeatAt = 0;
     return;
   }
 
@@ -381,51 +346,6 @@ void handleWebSocket(uint8_t client, WStype_t type,
     }
   }
 
-  else if (message[0] == 'K' &&
-           isspace((unsigned char)message[1])) {
-
-    /* Fixed-cadence heartbeat. Measures the phone-to-ESP32 path and keeps the
-       phone's Wi-Fi radio out of power save between sparse movement packets. */
-    noteHeartbeat(millis());
-  }
-
-  else if (message[0] == 'P' &&
-           isspace((unsigned char)message[1])) {
-
-    /* Latency probe. Reply: P <seq> <backlog> <gapMax> <gapMean> <loopMax> <n>
-       - backlog: movement still queued here, in whole ±127 reports
-       - gap*:    K heartbeat inter-arrival gap in ms, worst and mean
-       - loopMax: longest main-loop stall in ms
-       - n:       number of heartbeats measured */
-    p++;
-    if (!readNumber(p, a) || !commandFinished(p)) return;
-
-    int32_t pendingX;
-    int32_t pendingY;
-    movementBacklog(pendingX, pendingY);
-    int32_t backlog = pendingX < 0 ? -pendingX : pendingX;
-    int32_t backlogY = pendingY < 0 ? -pendingY : pendingY;
-    if (backlogY > backlog) backlog = backlogY;
-
-    uint32_t mean = heartbeatCount
-      ? (heartbeatGapSum + heartbeatCount / 2) / heartbeatCount
-      : 0;
-
-    char reply[56];
-    snprintf(reply, sizeof(reply), "P %ld %ld %lu %lu %lu %lu",
-             a, (backlog + 126) / 127,
-             (unsigned long)heartbeatGapMax,
-             (unsigned long)mean,
-             (unsigned long)loopMaxMs,
-             (unsigned long)heartbeatCount);
-
-    webSocket.sendTXT(client, reply);
-
-    heartbeatGapSum = 0;
-    heartbeatGapMax = 0;
-    heartbeatCount = 0;
-    loopMaxMs = 0;
-  }
 }
 
 void serviceTask(void*) {
@@ -436,12 +356,6 @@ void serviceTask(void*) {
     httpServer.handleClient();
 
     uint32_t now = millis();
-
-    if (lastLoopAt != 0) {
-      uint32_t stall = now - lastLoopAt;
-      if (stall > loopMaxMs) loopMaxMs = stall;
-    }
-    lastLoopAt = now;
 
     keepBleLinkActive(now);
     pushBleStatus(now);
@@ -477,8 +391,6 @@ void disableHttpCache() {
 }
 
 void setup() {
-  Serial.begin(115200);
-
   pinMode(STATUS_LED_PIN, OUTPUT);
   digitalWrite(STATUS_LED_PIN, STATUS_LED_ACTIVE_HIGH ? LOW : HIGH);
 
@@ -510,20 +422,9 @@ void setup() {
     httpServer.send_P(200, "application/javascript", APP_JS);
   });
 
-  httpServer.on("/status", HTTP_GET, []() {
-    disableHttpCache();
-    String result = "{\"ble\":";
-    result += mouse.isConnected() ? "true" : "false";
-    result += ",\"wifiClients\":";
-    result += String(WiFi.softAPgetStationNum());
-    result += "}";
-
-    httpServer.send(200, "application/json", result);
-  });
-
   httpServer.begin();
 
-  mouse.setLogLevel(HIDLogLevel::Normal);
+  mouse.setLogLevel(HIDLogLevel::Off);
   mouse.setUpdateRate(HIDRate::Hz125);
   mouse.begin();
 
@@ -550,10 +451,6 @@ void setup() {
     0
   );
 
-  Serial.println("ESP3D ready");
-  Serial.println("Wi-Fi: ESP3D_Controller");
-  Serial.println("Password: ESP3D-1234");
-  Serial.println("Open: http://192.168.4.1");
 }
 
 void loop() {

@@ -37,21 +37,12 @@ const hapticsEnabledInput = document.getElementById('hapticsEnabled');
 const hapticIntensityInput = document.getElementById('hapticIntensity');
 const hapticIntensityValue = document.getElementById('hapticIntensityValue');
 const connectionAlertsInput = document.getElementById('connectionAlerts');
-const hapticTestButton = document.getElementById('hapticTest');
-const hapticNote = document.getElementById('hapticNote');
 
 /* ----------------------------- tunables -------------------------------- */
 
 const WS_PORT = 81;
 const WS_RECONNECT_MIN_MS = 500;
 const WS_RECONNECT_MAX_MS = 5000;
-
-/* A fixed-cadence heartbeat keeps the phone's Wi-Fi radio out of power save.
-   With sparse traffic (a slow drag emits only a few packets per second) an
-   Android radio can drop into power save and buffer packets until the next
-   beacon, which shows up as the cursor stopping and then jumping. The ESP32
-   uses the arrival gaps of these packets to measure the real link. */
-const HEARTBEAT_MS = 30;
 
 /* Each pointer event is flushed immediately. The firmware accumulates the
    deltas, so there is no need to pace the phone below the BLE report rate —
@@ -84,9 +75,6 @@ const MOMENTUM_MAX_UNITS_PER_MS = 0.1; /* 100 ticks/s, below the HID drain rate 
 const MOMENTUM_TAU_MS = 320;         /* exponential decay time constant */
 const MOMENTUM_STOP_V = 0.01;        /* px/ms — end of the coast */
 const MOMENTUM_MAX_MS = 2200;
-
-/* Link latency probe (round trip to the ESP32 over Wi-Fi). */
-const PING_INTERVAL_MS = 1500;
 
 const HAPTIC = {
   left: 10,
@@ -200,30 +188,6 @@ let reconnectTimer = 0;
 let reconnectDelay = WS_RECONNECT_MIN_MS;
 let lastBleState = null;
 
-/* Round-trip time to the ESP32, shown in the header so link latency can be
-   told apart from BLE/pointer latency. */
-let pingSeq = 0;
-let pingAt = 0;
-let linkRtt = 0;
-let linkJitter = 0;
-let linkBacklog = 0;
-
-/* Delivery diagnostics.
-
-   touchGap* measures the interval between real pointer samples on this page:
-   a spike means Chrome or the touch panel stalled, not the network.
-   linkGap*, loopMax and heartbeatCount come from the ESP32's P reply: the
-   interval between our heartbeats as they arrive, and the firmware's longest
-   main-loop stall. */
-let heartbeatSeq = 0;
-let lastTouchSampleAt = 0;
-let touchGapSum = 0;
-let touchGapMax = 0;
-let touchGapCount = 0;
-let linkGapMax = 0;
-let linkGapMean = 0;
-let linkLoopMax = 0;
-let linkSampleCount = 0;
 
 function socketUrl() {
   const host = location.hostname;
@@ -285,14 +249,11 @@ function connect() {
     reconnectDelay = WS_RECONNECT_MIN_MS;
     setPhoneState('ok', 'PHONE CONNECTED');
     setBleUnknown();
-    pingLink();
   };
 
   socket.onclose = () => {
     if (ws !== socket) return;
     ws = null;
-    pingAt = 0;
-    lastTouchSampleAt = 0;
     releaseAllButtons(false);
     resetMotion();
     resetPadState();
@@ -316,97 +277,6 @@ function handleIncoming(message) {
     setBleState(message[2] === '1');
     return;
   }
-
-  if (message.length < 3 || message[0] !== 'P' || message[1] !== ' ') return;
-
-  const parts = message.slice(2).split(' ');
-  const seq = Number(parts[0]);
-  if (!pingAt || seq !== pingSeq) return;
-
-  const rtt = nowMs() - pingAt;
-  pingAt = 0;
-
-  /* Exponentially smoothed RTT and mean absolute jitter. */
-  linkJitter = linkRtt
-    ? linkJitter * 0.7 + Math.abs(rtt - linkRtt) * 0.3
-    : 0;
-  linkRtt = linkRtt ? linkRtt * 0.7 + rtt * 0.3 : rtt;
-
-  /* P <seq> <backlog> <gapMax> <gapMean> <loopMax> <n> */
-  linkBacklog = Number(parts[1]) || 0;
-  linkGapMax = Number(parts[2]) || 0;
-  linkGapMean = Number(parts[3]) || 0;
-  linkLoopMax = Number(parts[4]) || 0;
-  linkSampleCount = Number(parts[5]) || 0;
-
-  renderLink();
-
-  touchGapSum = 0;
-  touchGapMax = 0;
-  touchGapCount = 0;
-}
-
-function renderLink() {
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
-
-  const shaky = linkJitter > 20;
-  const busy = linkBacklog >= 3;
-  const touchStall = touchGapMax > 30;
-  const linkStall = linkGapMax > 120;
-
-  let text = `PHONE CONNECTED · ${Math.round(linkRtt)} ms`;
-  if (shaky) text += ` ±${Math.round(linkJitter)}`;
-  if (busy) text += ' · BUSY';
-  if (touchStall) text += ` · TOUCH ${Math.round(touchGapMax)}`;
-  if (linkStall) text += ` · LINK ${Math.round(linkGapMax)}`;
-
-  phoneStatus.dataset.state =
-    (linkRtt > 60 || shaky || busy || touchStall || linkStall) ? 'warn' : 'ok';
-  phoneStatus.textContent = text;
-
-  phoneStatus.title =
-    `RTT ${Math.round(linkRtt)} ms (jitter ${Math.round(linkJitter)})` +
-    ` · touch max ${Math.round(touchGapMax)} ms (${touchGapCount} samples)` +
-    ` · link max ${Math.round(linkGapMax)} ms / mean ${Math.round(linkGapMean)} ms` +
-    ` (${linkSampleCount} packets)` +
-    ` · firmware stall ${Math.round(linkLoopMax)} ms` +
-    ` · backlog ${linkBacklog}`;
-}
-
-/* Gaps between real pointer samples. Duplicate deliveries (pointermove and
-   pointerrawupdate for the same position) are filtered out by the caller so
-   a zero gap cannot hide a later stall. */
-function noteTouchSample(now) {
-  if (lastTouchSampleAt) {
-    const gap = now - lastTouchSampleAt;
-    if (gap > 0 && gap < 500) {
-      touchGapSum += gap;
-      if (gap > touchGapMax) touchGapMax = gap;
-      touchGapCount++;
-    }
-  }
-  lastTouchSampleAt = now;
-}
-
-/* Keeps the Wi-Fi link hot so Android does not enter power save between
-   sparse movement packets. Also gives the ESP32 a fixed-cadence signal to
-   measure the real arrival jitter. */
-function heartbeat() {
-  if (document.hidden) return;
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
-  if (ws.bufferedAmount > BACKPRESSURE_LIMIT) return;
-
-  heartbeatSeq = (heartbeatSeq + 1) % 1000000;
-  send(`K ${heartbeatSeq}`);
-}
-
-function pingLink() {
-  if (document.hidden) return;
-  if (!ws || ws.readyState !== WebSocket.OPEN) return;
-
-  pingSeq = (pingSeq + 1) % 1000000;
-  pingAt = nowMs();
-  send(`P ${pingSeq}`);
 }
 
 function scheduleReconnect() {
@@ -433,10 +303,7 @@ function send(message) {
   }
 }
 
-/* BLE status arrives as a WebSocket push ("B 0" / "B 1") from the firmware.
-   The old /status HTTP poll is gone: on a single-threaded ESP32 that fetch
-   opened a TCP connection and could block the loop, which is exactly the
-   path a movement packet needs. /status still exists for manual checks. */
+/* BLE status arrives as a WebSocket push ("B 0" / "B 1") from the firmware. */
 
 /* --------------------------- movement batching ------------------------- */
 
@@ -941,10 +808,6 @@ pad.addEventListener('pointerdown', event => {
   /* Start a fresh gap window for each gesture: the interval between gestures
      is not a delivery gap. */
   if (padPointers.size === 0) {
-    lastTouchSampleAt = 0;
-    touchGapSum = 0;
-    touchGapMax = 0;
-    touchGapCount = 0;
   }
 
   padPointers.set(event.pointerId, {
@@ -1011,7 +874,6 @@ function handlePointerMove(event) {
      pointerrawupdate can both deliver the same position; counting that twice
      would add a 0 ms gap and hide a later stall. */
   if (pointer.x !== previousX || pointer.y !== previousY) {
-    noteTouchSample(nowMs());
   }
 
   const distance = Math.hypot(
@@ -1239,7 +1101,6 @@ function applySettingsToControls() {
   virtualMouseInput.checked = settings.virtualMouse;
   virtualButtons.hidden = !settings.virtualMouse;
   hapticIntensityInput.disabled = !settings.haptics;
-  hapticTestButton.disabled = !settings.haptics || !hapticsSupported;
 
   refreshSettingLabels();
 }
@@ -1272,7 +1133,6 @@ function initSettings() {
   hapticsEnabledInput.addEventListener('change', () => {
     settings.haptics = hapticsEnabledInput.checked;
     hapticIntensityInput.disabled = !settings.haptics;
-    hapticTestButton.disabled = !settings.haptics || !hapticsSupported;
     saveSettings();
     if (settings.haptics) vibrate(HAPTIC.gesture);
   });
@@ -1299,14 +1159,6 @@ function initSettings() {
     saveSettings();
   });
 
-  hapticTestButton.addEventListener('click', () => {
-    vibrate([12, 60, 12]);
-  });
-
-  if (!hapticsSupported) {
-    hapticNote.hidden = false;
-    hapticTestButton.disabled = true;
-  }
 }
 
 /* ------------------------------- startup ------------------------------- */
@@ -1315,8 +1167,6 @@ function startup() {
   initSettings();
 
   connect();
-  setInterval(heartbeat, HEARTBEAT_MS);
-  setInterval(pingLink, PING_INTERVAL_MS);
 }
 
 document.addEventListener('visibilitychange', () => {
@@ -1326,8 +1176,6 @@ document.addEventListener('visibilitychange', () => {
     resetPadState();
   } else {
     if (!ws) connect();
-    heartbeat();
-    pingLink();
   }
 });
 
