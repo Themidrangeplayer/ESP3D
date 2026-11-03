@@ -60,7 +60,7 @@ const BACKPRESSURE_RETRY_MS = 16;
 const MOVE_BATCH_MS = 1;
 const MAX_MOVE_PER_MSG = 30000;   /* safety clamp; firmware chunks to ±127 */
 const BACKPRESSURE_LIMIT = 2048;
-const STALE_INPUT_MS = 80;
+const STALE_INPUT_MS = 180;
 
 const TAP_MAX_MS = 320;
 const TAP_MAX_MOVE_PX = 10;
