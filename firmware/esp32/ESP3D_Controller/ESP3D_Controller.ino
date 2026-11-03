@@ -1,22 +1,40 @@
 #include <WiFi.h>
-#include <WebServer.h>
-#include <WebSocketsServer.h>
+#include <esp_https_server.h>
 #include <HijelHID_BLEMouse.h>
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
 #include "web_ui.h"
+#include "tls_credentials.h"
 
 const char* AP_SSID = "ESP3D_Controller";
 const char* AP_PASSWORD = "ESP3D-1234";
 
-WebServer httpServer(80);
-WebSocketsServer webSocket(81);
+httpd_handle_t httpsServer = nullptr;
+int wsClientFd = -1;
 HijelBLEMouse mouse("ESP3D", "ESP3D Project", 100, 5, true);
 
 uint8_t heldButtons = 0;
 uint32_t lastButtonActivity = 0;
 const uint32_t BUTTON_TIMEOUT_MS = 10000;
+
+bool hasWebSocketClient() {
+  return httpsServer != nullptr && wsClientFd >= 0 &&
+         httpd_ws_get_fd_info(httpsServer, wsClientFd) == HTTPD_WS_CLIENT_WEBSOCKET;
+}
+
+void sendWebSocketText(const char* message, int fd = -1) {
+  if (!hasWebSocketClient()) {
+    wsClientFd = -1;
+    return;
+  }
+
+  httpd_ws_frame_t frame = {};
+  frame.type = HTTPD_WS_TYPE_TEXT;
+  frame.payload = (uint8_t*)message;
+  frame.len = strlen(message);
+  httpd_ws_send_frame_async(httpsServer, fd >= 0 ? fd : wsClientFd, &frame);
+}
 
 /* The HID library's move() replaces its pending report delta. Movement is
    therefore drained once per matching 7 ms report interval, rather than
@@ -90,7 +108,7 @@ void ledActivity(uint32_t now) {
 }
 
 uint8_t currentLedMode() {
-  bool phone = webSocket.connectedClients() > 0;
+  bool phone = hasWebSocketClient();
   bool ble = mouse.isConnected() && mouse.isPaired();
 
   if (!phone) return 0;
@@ -213,15 +231,14 @@ void pushBleStatus(uint32_t now, int client = -1) {
   char msg[8];
   snprintf(msg, sizeof(msg), "B %d", state);
 
-  if (client >= 0) webSocket.sendTXT((uint8_t)client, msg);
-  else webSocket.broadcastTXT(msg);
+  sendWebSocketText(msg, client);
 }
 
 void keepBleLinkActive(uint32_t now) {
   if (now - lastKeepAlive < KEEP_ALIVE_MS) return;
   lastKeepAlive = now;
 
-  if (webSocket.connectedClients() == 0) return;
+  if (!hasWebSocketClient()) return;
   if (!mouse.isConnected() || !mouse.isPaired()) return;
 
   /* Zero delta: refreshes the library idle clock without emitting a report. */
@@ -249,22 +266,8 @@ void flushMovement(uint32_t now) {
   mouse.move(dx, dy);
 }
 
-void handleWebSocket(uint8_t client, WStype_t type,
-                     uint8_t* payload, size_t length) {
-
-  if (type == WStype_DISCONNECTED) {
-    releaseAllButtons();
-    clearPendingInput();
-    lastHeartbeatAt = 0;
-    return;
-  }
-
-  if (type == WStype_CONNECTED) {
-    pushBleStatus(millis(), (int)client);
-    return;
-  }
-
-  if (type != WStype_TEXT || length == 0 || length > 40) return;
+void handleWebSocketMessage(int client, uint8_t* payload, size_t length) {
+  if (length == 0 || length > 40) return;
 
   char message[41];
   memcpy(message, payload, length);
@@ -388,7 +391,7 @@ void handleWebSocket(uint8_t client, WStype_t type,
              (unsigned long)loopMaxMs,
              (unsigned long)heartbeatCount);
 
-    webSocket.sendTXT(client, reply);
+    sendWebSocketText(reply, client);
 
     heartbeatGapSum = 0;
     heartbeatGapMax = 0;
@@ -397,24 +400,104 @@ void handleWebSocket(uint8_t client, WStype_t type,
   }
 }
 
-void disableHttpCache() {
-  httpServer.sendHeader(
-    "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0"
+esp_err_t webSocketHandler(httpd_req_t* request) {
+  const int client = httpd_req_to_sockfd(request);
+
+  if (request->method == HTTP_GET) {
+    if (wsClientFd >= 0 && wsClientFd != client) {
+      releaseAllButtons();
+      clearPendingInput();
+    }
+    wsClientFd = client;
+    pushBleStatus(millis(), client);
+    return ESP_OK;
+  }
+
+  httpd_ws_frame_t frame = {};
+  esp_err_t result = httpd_ws_recv_frame(request, &frame, 0);
+  if (result != ESP_OK) return result;
+
+  if (frame.type == HTTPD_WS_TYPE_CLOSE) {
+    if (wsClientFd == client) wsClientFd = -1;
+    releaseAllButtons();
+    clearPendingInput();
+    lastHeartbeatAt = 0;
+    return ESP_OK;
+  }
+
+  if (frame.type != HTTPD_WS_TYPE_TEXT || frame.len == 0 || frame.len > 40) {
+    return ESP_OK;
+  }
+
+  uint8_t message[41];
+  frame.payload = message;
+  result = httpd_ws_recv_frame(request, &frame, sizeof(message) - 1);
+  if (result != ESP_OK) return result;
+  message[frame.len] = '\0';
+  handleWebSocketMessage(client, message, frame.len);
+  return ESP_OK;
+}
+
+void setSecurityHeaders(httpd_req_t* request) {
+  httpd_resp_set_hdr(
+    request, "Cache-Control", "no-store, no-cache, must-revalidate, max-age=0"
   );
-  httpServer.sendHeader("Pragma", "no-cache");
-  httpServer.sendHeader("Expires", "0");
-  httpServer.sendHeader("X-Content-Type-Options", "nosniff");
-  httpServer.sendHeader("Referrer-Policy", "no-referrer");
-  httpServer.sendHeader(
-    "Permissions-Policy", "accelerometer=(self), gyroscope=(self), magnetometer=()"
+  httpd_resp_set_hdr(request, "Pragma", "no-cache");
+  httpd_resp_set_hdr(request, "Expires", "0");
+  httpd_resp_set_hdr(request, "X-Content-Type-Options", "nosniff");
+  httpd_resp_set_hdr(request, "Referrer-Policy", "no-referrer");
+  httpd_resp_set_hdr(
+    request, "Permissions-Policy",
+    "accelerometer=(self), gyroscope=(self), magnetometer=()"
   );
-  httpServer.sendHeader(
-    "Content-Security-Policy",
+  httpd_resp_set_hdr(
+    request, "Content-Security-Policy",
     "default-src 'self'; base-uri 'none'; form-action 'none'; "
     "frame-ancestors 'none'; object-src 'none'; "
     "script-src 'self'; style-src 'self'; "
-    "connect-src 'self' ws://192.168.4.1:81"
+    "connect-src 'self' wss://192.168.4.1"
   );
+}
+
+esp_err_t sendAsset(httpd_req_t* request, const char* type,
+                    const char* data, size_t length) {
+  setSecurityHeaders(request);
+  httpd_resp_set_type(request, type);
+  return httpd_resp_send(request, data, length);
+}
+
+esp_err_t rootHandler(httpd_req_t* request) {
+  return sendAsset(request, "text/html", INDEX_HTML, HTTPD_RESP_USE_STRLEN);
+}
+
+esp_err_t styleHandler(httpd_req_t* request) {
+  return sendAsset(request, "text/css", STYLE_CSS, HTTPD_RESP_USE_STRLEN);
+}
+
+esp_err_t scriptHandler(httpd_req_t* request) {
+  return sendAsset(
+    request, "application/javascript", APP_JS, HTTPD_RESP_USE_STRLEN
+  );
+}
+
+esp_err_t statusHandler(httpd_req_t* request) {
+  char result[96];
+  snprintf(
+    result, sizeof(result), "{\"ble\":%s,\"wifiClients\":%u}",
+    mouse.isConnected() ? "true" : "false",
+    (unsigned)WiFi.softAPgetStationNum()
+  );
+  return sendAsset(
+    request, "application/json", result, HTTPD_RESP_USE_STRLEN
+  );
+}
+
+void registerHttpRoute(const char* uri, esp_err_t (*handler)(httpd_req_t*)) {
+  httpd_uri_t route = {};
+  route.uri = uri;
+  route.method = HTTP_GET;
+  route.handler = handler;
+  httpd_register_uri_handler(httpsServer, &route);
 }
 
 void setup() {
@@ -426,64 +509,45 @@ void setup() {
   WiFi.mode(WIFI_AP);
   WiFi.softAP(AP_SSID, AP_PASSWORD, 1, false, 1);
 
-  httpServer.on("/", HTTP_GET, []() {
-    disableHttpCache();
-    httpServer.send_P(200, "text/html", INDEX_HTML);
-  });
-
-  httpServer.on("/style.css", HTTP_GET, []() {
-    disableHttpCache();
-    httpServer.send_P(200, "text/css", STYLE_CSS);
-  });
-
-  httpServer.on("/css/style.css", HTTP_GET, []() {
-    disableHttpCache();
-    httpServer.send_P(200, "text/css", STYLE_CSS);
-  });
-
-  httpServer.on("/app.js", HTTP_GET, []() {
-    disableHttpCache();
-    httpServer.send_P(200, "application/javascript", APP_JS);
-  });
-
-  httpServer.on("/js/app.js", HTTP_GET, []() {
-    disableHttpCache();
-    httpServer.send_P(200, "application/javascript", APP_JS);
-  });
-
-  httpServer.on("/status", HTTP_GET, []() {
-    disableHttpCache();
-    String result = "{\"ble\":";
-    result += mouse.isConnected() ? "true" : "false";
-    result += ",\"wifiClients\":";
-    result += String(WiFi.softAPgetStationNum());
-    result += "}";
-
-    httpServer.send(200, "application/json", result);
-  });
-
-  httpServer.begin();
-
   mouse.setLogLevel(HIDLogLevel::Normal);
   mouse.setUpdateRate(HIDRate::Hz100);
   mouse.begin();
 
-  webSocket.begin();
-  webSocket.onEvent(handleWebSocket);
+  httpd_ssl_config_t config = HTTPD_SSL_CONFIG_DEFAULT();
+  config.servercert = SERVER_CERTIFICATE;
+  config.servercert_len = SERVER_CERTIFICATE_LEN;
+  config.prvtkey_pem = SERVER_PRIVATE_KEY;
+  config.prvtkey_len = SERVER_PRIVATE_KEY_LEN;
+  config.port_secure = 443;
+  config.httpd.max_uri_handlers = 8;
+
+  if (httpd_ssl_start(&httpsServer, &config) != ESP_OK) {
+    Serial.println("ERROR: HTTPS server failed to start");
+    return;
+  }
+
+  registerHttpRoute("/", rootHandler);
+  registerHttpRoute("/style.css", styleHandler);
+  registerHttpRoute("/css/style.css", styleHandler);
+  registerHttpRoute("/app.js", scriptHandler);
+  registerHttpRoute("/js/app.js", scriptHandler);
+  registerHttpRoute("/status", statusHandler);
+
+  httpd_uri_t webSocketRoute = {};
+  webSocketRoute.uri = "/";
+  webSocketRoute.method = HTTP_GET;
+  webSocketRoute.handler = webSocketHandler;
+  webSocketRoute.is_websocket = true;
+  webSocketRoute.handle_ws_control_frames = true;
+  httpd_register_uri_handler(httpsServer, &webSocketRoute);
 
   Serial.println("ESP3D ready");
   Serial.println("Wi-Fi: ESP3D_Controller");
   Serial.println("Password: ESP3D-1234");
-  Serial.println("Open: http://192.168.4.1");
+  Serial.println("Open: https://192.168.4.1");
 }
 
 void loop() {
-  /* Serve the input socket before HTTP: a status request must never sit in
-     front of a movement packet. The page no longer polls HTTP at all; the
-     endpoint is kept for manual diagnostics. */
-  webSocket.loop();
-  httpServer.handleClient();
-
   uint32_t now = millis();
 
   if (lastLoopAt != 0) {
