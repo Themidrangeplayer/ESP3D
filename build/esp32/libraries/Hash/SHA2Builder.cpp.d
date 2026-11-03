@@ -1,0 +1,37 @@
+/Users/bobitagogoi/Desktop/ESP3D/build/esp32/libraries/Hash/SHA2Builder.cpp.o: \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/hardware/esp32/3.3.12/libraries/Hash/src/SHA2Builder.cpp \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/esp32-hal-log.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/esp_timer/include/esp_timer.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/newlib/platform_include/stdio.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/esp_common/include/esp_err.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/esp_common/include/esp_compiler.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/esp_hw_support/include/esp_etm.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/esp_rom/esp32/include/esp32/rom/ets_sys.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/log/include/esp_log.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/esp_rom/include/esp_rom_sys.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/soc/esp32/include/soc/reset_reasons.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/soc/esp32/include/soc/soc_caps.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/log/include/esp_log_config.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/log/include/esp_log_level.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/esp_common/include/esp_assert.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/log/include/esp_log_color.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/log/include/esp_log_buffer.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/log/include/esp_log_timestamp.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/log/include/esp_log_write.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/log/include/esp_log_format.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/log/include/esp_log_args.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/esp_common/include/esp_macros.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/esp_common/include/esp_assert.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/log/include/esp_log_attr.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/esp_common/include/esp_attr.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/log/include/esp_private/log_attr.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/hardware/esp32/3.3.12/libraries/Hash/src/SHA2Builder.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/WString.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/pgmspace.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/tools/esp32-libs/3.3.12/include/newlib/platform_include/ctype.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/Stream.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/Print.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/WString.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/Printable.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/HashBuilder.h \
+ /Users/bobitagogoi/Library/Arduino15/packages/esp32/hardware/esp32/3.3.12/cores/esp32/HEXBuilder.h

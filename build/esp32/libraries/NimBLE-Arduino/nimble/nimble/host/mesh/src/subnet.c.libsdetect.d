@@ -1,0 +1,6 @@
+subnet.o: \
+ /Users/bobitagogoi/Documents/Arduino/libraries/NimBLE-Arduino/src/nimble/nimble/host/mesh/src/subnet.c \
+ /Users/bobitagogoi/Documents/Arduino/libraries/NimBLE-Arduino/src/nimble/porting/nimble/include/syscfg/syscfg.h \
+ /Users/bobitagogoi/Documents/Arduino/libraries/NimBLE-Arduino/src/nimble/esp_port/port/include/esp_nimble_cfg.h \
+ /Users/bobitagogoi/Documents/Arduino/libraries/NimBLE-Arduino/src/nimconfig.h \
+ /Users/bobitagogoi/Documents/Arduino/libraries/NimBLE-Arduino/src/nimconfig_rename.h
