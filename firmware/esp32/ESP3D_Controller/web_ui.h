@@ -9,7 +9,7 @@ const char INDEX_HTML[] PROGMEM = R"ESP3D(
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0c0f14">
 <title>ESP3D Controller</title>
-<link rel="stylesheet" href="css/style.css?v=6">
+<link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
 
@@ -99,7 +99,7 @@ const char INDEX_HTML[] PROGMEM = R"ESP3D(
 
 <footer>ESP3D · BUILD 2026-11-03-7</footer>
 
-<script src="js/app.js?v=6"></script>
+<script src="js/app.js?v=7"></script>
 </body>
 </html>
 
@@ -107,19 +107,19 @@ const char INDEX_HTML[] PROGMEM = R"ESP3D(
 
 const char STYLE_CSS[] PROGMEM = R"ESP3D(
 :root {
-  --bg: #0c0f14;
-  --bg-2: #111722;
-  --panel: #151c27;
-  --panel-2: #1b2431;
-  --line: #2b3648;
-  --line-soft: #222c3b;
-  --text: #e8eef8;
-  --muted: #8b99ad;
-  --muted-2: #6f7d91;
-  --accent: #6ea8ff;
-  --ok: #5ee6a8;
-  --warn: #ffc46b;
-  --bad: #ff7b7b;
+  --bg: #101010;
+  --bg-2: #161616;
+  --panel: #1b1b1b;
+  --panel-2: #202020;
+  --line: #3a3a3a;
+  --line-soft: #2b2b2b;
+  --text: #f0f0f0;
+  --muted: #a0a0a0;
+  --muted-2: #777777;
+  --accent: #d0d0d0;
+  --ok: #d8d8d8;
+  --warn: #b8b8b8;
+  --bad: #8e8e8e;
   --radius: 18px;
 }
 
@@ -132,9 +132,7 @@ html, body {
 
 body {
   margin: 0;
-  background:
-    radial-gradient(120% 70% at 50% -10%, #1a2434 0%, var(--bg) 58%) fixed,
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text",
     "Segoe UI", Roboto, Arial, sans-serif;
@@ -236,12 +234,10 @@ main {
   height: clamp(240px, 42vh, 380px);
   border: 1px solid var(--line);
   border-radius: 26px;
-  background:
-    radial-gradient(80% 130% at 50% -10%, rgba(110, 168, 255, 0.12), transparent 62%),
-    linear-gradient(180deg, #1a2230, #141b26);
+  background: #181818;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.045),
-    0 20px 45px -28px #000;
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 16px 32px -24px #000;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -257,15 +253,15 @@ main {
   position: absolute;
   inset: 10px;
   border-radius: 20px;
-  border: 1px dashed rgba(110, 168, 255, 0.10);
+  border: 1px dashed #303030;
   pointer-events: none;
 }
 
 .touchpad.touching {
-  border-color: #3c5f92;
+  border-color: #a0a0a0;
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.07),
-    0 0 0 1px rgba(110, 168, 255, 0.18),
+    0 0 0 1px #505050,
     0 20px 45px -28px #000;
 }
 
@@ -331,8 +327,8 @@ main {
 button {
   font-family: inherit;
   color: var(--text);
-  background: linear-gradient(180deg, #232d3c, #1d2531);
-  border: 1px solid #3a475b;
+  background: #242424;
+  border: 1px solid #4a4a4a;
   border-radius: 15px;
   padding: 18px 8px;
   font-size: 12px;
@@ -345,15 +341,15 @@ button {
 }
 
 button:active {
-  background: linear-gradient(180deg, #3f5d85, #324a6c);
-  border-color: #5577a5;
+  background: #333333;
+  border-color: #707070;
   transform: translateY(1px);
 }
 
 /* ---------- settings ---------- */
 
 .panel {
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  background: var(--panel);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius);
   padding: 6px 16px 16px;
@@ -387,7 +383,7 @@ button:active {
 .setting input[type="range"] {
   width: 100%;
   margin: 12px 0 8px;
-  accent-color: var(--accent);
+  accent-color: #c0c0c0;
 }
 
 select {
@@ -395,7 +391,7 @@ select {
   margin: 10px 0 6px;
   padding: 11px 12px;
   color: var(--text);
-  background: #202a39;
+  background: #252525;
   border: 1px solid var(--line);
   border-radius: 10px;
   font: inherit;
@@ -420,8 +416,8 @@ input[type="checkbox"] {
   width: 46px;
   height: 27px;
   border-radius: 999px;
-  background: #26303f;
-  border: 1px solid #37455a;
+  background: #292929;
+  border: 1px solid #4a4a4a;
   position: relative;
   flex: none;
   cursor: pointer;
@@ -436,18 +432,18 @@ input[type="checkbox"]::after {
   width: 19px;
   height: 19px;
   border-radius: 50%;
-  background: #8794a7;
+  background: #888888;
   transition: transform 140ms ease, background 140ms ease;
 }
 
 input[type="checkbox"]:checked {
-  background: #2d4a72;
-  border-color: #4b6f9f;
+  background: #4a4a4a;
+  border-color: #777777;
 }
 
 input[type="checkbox"]:checked::after {
   transform: translateX(19px);
-  background: var(--accent);
+  background: #e0e0e0;
 }
 
 button.ghost {
