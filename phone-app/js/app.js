@@ -71,7 +71,7 @@ const HOLD_DRAG_MS = 400;         /* hold this long to latch the left button */
 const HOLD_DRAG_MAX_MOVE_PX = 6;
 
 const SCROLL_START_PX = 3;
-const SCROLL_GAIN = 0.035;      /* wheel units per px of two-finger travel */
+const SCROLL_GAIN = 0.1;        /* wheel units per px of two-finger travel */
 const MAX_SCROLL_PER_MSG = 127;
 const HORIZONTAL_SCROLL_ENABLED = false;
 

@@ -26,10 +26,10 @@ const uint32_t BUTTON_TIMEOUT_MS = 10000;
 int32_t pendingMoveX = 0;
 int32_t pendingMoveY = 0;
 
-uint32_t lastMoveDrain = 0;
-
 const uint32_t MOVE_DRAIN_MS = 8;    /* matches HIDRate::Hz125 */
 const int32_t MOVE_ACCUM_LIMIT = 2000;
+portMUX_TYPE movementMux = portMUX_INITIALIZER_UNLOCKED;
+TaskHandle_t movementTaskHandle = nullptr;
 
 /* Delivery diagnostics.
 
@@ -182,9 +182,10 @@ void releaseAllButtons() {
 }
 
 void clearPendingInput() {
+  portENTER_CRITICAL(&movementMux);
   pendingMoveX = 0;
   pendingMoveY = 0;
-  lastMoveDrain = 0;
+  portEXIT_CRITICAL(&movementMux);
 }
 
 void noteHeartbeat(uint32_t now) {
@@ -228,25 +229,54 @@ void keepBleLinkActive(uint32_t now) {
   mouse.addScroll(0);
 }
 
-void flushMovement(uint32_t now) {
-  if (pendingMoveX == 0 && pendingMoveY == 0) return;
+void drainMovementTask(void*) {
+  TickType_t lastWake = xTaskGetTickCount();
 
-  if (now - lastMoveDrain < MOVE_DRAIN_MS) return;
-  lastMoveDrain = now;
+  for (;;) {
+    vTaskDelayUntil(&lastWake, pdMS_TO_TICKS(MOVE_DRAIN_MS));
 
-  if (!mouse.isConnected() || !mouse.isPaired()) {
-    pendingMoveX = 0;
-    pendingMoveY = 0;
-    return;
+    int32_t queuedX;
+    int32_t queuedY;
+    portENTER_CRITICAL(&movementMux);
+    queuedX = pendingMoveX;
+    queuedY = pendingMoveY;
+    portEXIT_CRITICAL(&movementMux);
+
+    if (queuedX == 0 && queuedY == 0) continue;
+
+    if (!mouse.isConnected() || !mouse.isPaired()) {
+      clearPendingInput();
+      continue;
+    }
+
+    int16_t dx = (int16_t)constrain(queuedX, -127L, 127L);
+    int16_t dy = (int16_t)constrain(queuedY, -127L, 127L);
+
+    portENTER_CRITICAL(&movementMux);
+    pendingMoveX -= dx;
+    pendingMoveY -= dy;
+    portEXIT_CRITICAL(&movementMux);
+
+    mouse.move(dx, dy);
   }
+}
 
-  int16_t dx = (int16_t)constrain(pendingMoveX, -127L, 127L);
-  int16_t dy = (int16_t)constrain(pendingMoveY, -127L, 127L);
+void queueMovement(int32_t dx, int32_t dy) {
+  portENTER_CRITICAL(&movementMux);
+  pendingMoveX = constrain(
+    pendingMoveX + dx, -MOVE_ACCUM_LIMIT, MOVE_ACCUM_LIMIT
+  );
+  pendingMoveY = constrain(
+    pendingMoveY + dy, -MOVE_ACCUM_LIMIT, MOVE_ACCUM_LIMIT
+  );
+  portEXIT_CRITICAL(&movementMux);
+}
 
-  pendingMoveX -= dx;
-  pendingMoveY -= dy;
-
-  mouse.move(dx, dy);
+void movementBacklog(int32_t& x, int32_t& y) {
+  portENTER_CRITICAL(&movementMux);
+  x = pendingMoveX;
+  y = pendingMoveY;
+  portEXIT_CRITICAL(&movementMux);
 }
 
 void handleWebSocket(uint8_t client, WStype_t type,
@@ -285,12 +315,7 @@ void handleWebSocket(uint8_t client, WStype_t type,
     if (a < -32768 || a > 32767 ||
         b < -32768 || b > 32767) return;
 
-    pendingMoveX = constrain(
-      pendingMoveX + (int32_t)a, -MOVE_ACCUM_LIMIT, MOVE_ACCUM_LIMIT
-    );
-    pendingMoveY = constrain(
-      pendingMoveY + (int32_t)b, -MOVE_ACCUM_LIMIT, MOVE_ACCUM_LIMIT
-    );
+    queueMovement((int32_t)a, (int32_t)b);
 
     ledActivity(millis());
   }
@@ -372,8 +397,11 @@ void handleWebSocket(uint8_t client, WStype_t type,
     p++;
     if (!readNumber(p, a) || !commandFinished(p)) return;
 
-    int32_t backlog = pendingMoveX < 0 ? -pendingMoveX : pendingMoveX;
-    int32_t backlogY = pendingMoveY < 0 ? -pendingMoveY : pendingMoveY;
+    int32_t pendingX;
+    int32_t pendingY;
+    movementBacklog(pendingX, pendingY);
+    int32_t backlog = pendingX < 0 ? -pendingX : pendingX;
+    int32_t backlogY = pendingY < 0 ? -pendingY : pendingY;
     if (backlogY > backlog) backlog = backlogY;
 
     uint32_t mean = heartbeatCount
@@ -468,6 +496,16 @@ void setup() {
   mouse.setUpdateRate(HIDRate::Hz125);
   mouse.begin();
 
+  xTaskCreatePinnedToCore(
+    drainMovementTask,
+    "hid-movement",
+    3072,
+    nullptr,
+    2,
+    &movementTaskHandle,
+    1
+  );
+
   webSocket.begin();
   webSocket.onEvent(handleWebSocket);
 
@@ -492,7 +530,6 @@ void loop() {
   }
   lastLoopAt = now;
 
-  flushMovement(now);
   keepBleLinkActive(now);
   pushBleStatus(now);
   updateStatusLed(now);
