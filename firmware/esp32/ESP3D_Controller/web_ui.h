@@ -1287,6 +1287,7 @@ const MOTION_DAMPING = 0.86;
 const MOTION_GAIN = 145;
 const GYRO_DEADZONE = 1.5;
 const GYRO_GAIN = 5.5;
+const FUSION_ACCEL_WEIGHT = 0.02;
 let motionEnabled = false;
 let motionMode = 'off';
 let motionFrame = 0;
@@ -1294,6 +1295,9 @@ let motionLastAt = 0;
 let motionVelocityX = 0;
 let motionVelocityY = 0;
 let motionPermissionPending = false;
+let fusionAngleX = 0;
+let fusionAngleY = 0;
+let fusionSensorAt = 0;
 
 function motionSupported() {
   return window.isSecureContext &&
@@ -1305,6 +1309,9 @@ function recenterMotion() {
   motionVelocityX = 0;
   motionVelocityY = 0;
   motionLastAt = 0;
+  fusionAngleX = 0;
+  fusionAngleY = 0;
+  fusionSensorAt = 0;
   resetMotion();
   showFeedback('MOTION RECENTERED');
 }
@@ -1348,15 +1355,57 @@ function handleMotion(event) {
     const rotation = event.rotationRate;
     if (!rotation ||
         !Number.isFinite(rotation.alpha) ||
-        !Number.isFinite(rotation.beta)) {
+        !Number.isFinite(rotation.beta) ||
+        !Number.isFinite(rotation.gamma)) {
       motionNote.hidden = false;
       return;
     }
 
-    const x = Math.abs(rotation.gamma) > GYRO_DEADZONE
-      ? -rotation.gamma * GYRO_GAIN : 0;
-    const y = Math.abs(rotation.beta) > GYRO_DEADZONE
-      ? -rotation.beta * GYRO_GAIN : 0;
+    const sensorAt = Number.isFinite(event.timeStamp) && event.timeStamp > 0
+      ? event.timeStamp : performance.now();
+    const gravity = event.accelerationIncludingGravity;
+    const hasGravity = gravity && Number.isFinite(gravity.x) &&
+      Number.isFinite(gravity.y) && Number.isFinite(gravity.z);
+    const dt = fusionSensorAt
+      ? Math.min(0.05, Math.max(0.001, (sensorAt - fusionSensorAt) / 1000))
+      : 0;
+    fusionSensorAt = sensorAt;
+
+    const gyroX = Math.abs(rotation.gamma) > GYRO_DEADZONE
+      ? -rotation.gamma : 0;
+    const gyroY = Math.abs(rotation.beta) > GYRO_DEADZONE
+      ? -rotation.beta : 0;
+
+    if (!dt) {
+      if (hasGravity) {
+        fusionAngleX = -Math.atan2(
+          gravity.x, Math.hypot(gravity.y, gravity.z)
+        ) * 180 / Math.PI;
+        fusionAngleY = -Math.atan2(
+          gravity.y, Math.hypot(gravity.x, gravity.z)
+        ) * 180 / Math.PI;
+      }
+      return;
+    }
+
+    const previousAngleX = fusionAngleX;
+    const previousAngleY = fusionAngleY;
+    fusionAngleX += gyroX * dt;
+    fusionAngleY += gyroY * dt;
+
+    if (hasGravity) {
+      const accelX = -Math.atan2(
+        gravity.x, Math.hypot(gravity.y, gravity.z)
+      ) * 180 / Math.PI;
+      const accelY = -Math.atan2(
+        gravity.y, Math.hypot(gravity.x, gravity.z)
+      ) * 180 / Math.PI;
+      fusionAngleX += (accelX - fusionAngleX) * FUSION_ACCEL_WEIGHT;
+      fusionAngleY += (accelY - fusionAngleY) * FUSION_ACCEL_WEIGHT;
+    }
+
+    const x = ((fusionAngleX - previousAngleX) / dt) * GYRO_GAIN;
+    const y = ((fusionAngleY - previousAngleY) / dt) * GYRO_GAIN;
     motionVelocityX += x;
     motionVelocityY += y;
     return;
