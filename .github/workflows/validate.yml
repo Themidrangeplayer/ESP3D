@@ -3,7 +3,9 @@ name: Validate
 on:
   push:
     branches: ["**"]
+    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -44,3 +46,11 @@ jobs:
       - name: Build Android release
         working-directory: android-app
         run: ./gradlew assembleRelease
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: esp3d-android-${{ github.ref_name }}-${{ github.sha }}
+          path: android-app/app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+          retention-days: 30
