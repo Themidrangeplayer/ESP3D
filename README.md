@@ -149,6 +149,11 @@ The optional Android app bundles the same controller UI in a full-screen
 WebView and provides a network-pinned WebSocket proxy for the ESP32 access
 point. It requires Android 8.0 (API 26) or newer.
 
+Download the latest published APK from the
+[ESP3D releases page](https://github.com/Themidrangeplayer/ESP3D/releases).
+The release APK is unsigned; sign it with your own Android signing key before
+distributing it to end users.
+
 ```bash
 cd android-app
 ./gradlew assembleRelease
@@ -158,6 +163,20 @@ The unsigned APK is written to
 `android-app/app/build/outputs/apk/release/app-release-unsigned.apk`.
 See [`android-app/README.md`](android-app/README.md) for installation,
 permissions, and release-signing guidance.
+
+## GitHub Actions builds
+
+Every push, pull request, and version tag runs the validation workflow. The
+Android job builds the release APK and uploads it as an Actions artifact for
+30 days. To build it manually:
+
+1. Open the [Validate workflow](https://github.com/Themidrangeplayer/ESP3D/actions/workflows/validate.yml).
+2. Select **Run workflow** and choose the branch.
+3. Open the completed run and download the `esp3d-android-*` artifact.
+
+Artifacts are unsigned release builds intended for testing. A tagged release
+also publishes the APK on the
+[releases page](https://github.com/Themidrangeplayer/ESP3D/releases).
 
 ## Development checks
 
@@ -189,9 +208,11 @@ git tag -a v1.1.0 -m "ESP3D v1.1.0"
 git push origin v1.1.0
 ```
 
-GitHub Actions validates asset generation, JavaScript syntax, and the firmware
-source on every push and pull request. Release binaries should be built from
-the tagged source with the board-specific Arduino CLI command above.
+GitHub Actions validates asset generation, JavaScript syntax, firmware source,
+and the Android release build on every push and pull request. Version tags also
+trigger the same checks, including the APK artifact upload. Release binaries
+should be built from the tagged source with the board-specific Arduino CLI
+command above.
 
 ## License
 
