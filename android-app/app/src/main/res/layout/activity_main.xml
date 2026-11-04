@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#101010">
+
+    <WebView
+        android:id="@+id/webView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#101010" />
+
+    <LinearLayout
+        android:id="@+id/overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#101010"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:paddingStart="36dp"
+        android:paddingEnd="36dp"
+        android:visibility="visible">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:letterSpacing="0.18"
+            android:text="@string/brand"
+            android:textColor="#f0f0f0"
+            android:textSize="32sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:letterSpacing="0.18"
+            android:text="@string/subtitle"
+            android:textColor="#777777"
+            android:textSize="10sp" />
+
+        <TextView
+            android:id="@+id/overlayStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="36dp"
+            android:gravity="center"
+            android:lineSpacingExtra="4dp"
+            android:text="@string/status_looking"
+            android:textColor="#a0a0a0"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/connectButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:background="@drawable/bg_button"
+            android:backgroundTint="@null"
+            android:letterSpacing="0.12"
+            android:paddingTop="16dp"
+            android:paddingBottom="16dp"
+            android:stateListAnimator="@null"
+            android:text="@string/connect"
+            android:textAllCaps="false"
+            android:textColor="#f0f0f0"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+
+        <Button
+            android:id="@+id/wifiSettingsButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_button_secondary"
+            android:backgroundTint="@null"
+            android:letterSpacing="0.12"
+            android:paddingTop="15dp"
+            android:paddingBottom="15dp"
+            android:stateListAnimator="@null"
+            android:text="@string/wifi_settings"
+            android:textAllCaps="false"
+            android:textColor="#a0a0a0"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:gravity="center"
+            android:lineSpacingExtra="4dp"
+            android:text="@string/note"
+            android:textColor="#666666"
+            android:textSize="11sp" />
+
+    </LinearLayout>
+
+</FrameLayout>

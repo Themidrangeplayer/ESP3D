@@ -28,3 +28,19 @@ jobs:
 
       - name: Check generated and source files
         run: git diff --check
+
+  android-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Build Android release
+        working-directory: android-app
+        run: ./gradlew assembleRelease

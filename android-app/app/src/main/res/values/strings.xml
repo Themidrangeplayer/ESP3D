@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ESP3D</string>
+    <string name="brand">ESP3D</string>
+    <string name="subtitle">WIRELESS CONTROL SYSTEM</string>
+    <string name="status_need_wifi">Connect your phone to the ESP3D_Controller Wi-Fi network to continue.</string>
+    <string name="status_looking">Looking for ESP3D_Controller…</string>
+    <string name="status_requesting">Approve the Android prompt to join ESP3D_Controller.</string>
+    <string name="status_connecting">Connected. Starting the touchpad…</string>
+    <string name="status_connect_failed">Could not join automatically. Open Wi-Fi settings and choose ESP3D_Controller.</string>
+    <string name="status_open_settings_failed">Could not open Wi-Fi settings.</string>
+    <string name="status_load_failed">Could not load the controller interface.</string>
+    <string name="connect">CONNECT</string>
+    <string name="wifi_settings">WI-FI SETTINGS</string>
+    <string name="note">The ESP3D network has no internet access. If Android asks whether to stay connected, choose Stay connected. Mobile data is never used for the controller link.</string>
+    <string name="retry">RETRY</string>
+</resources>

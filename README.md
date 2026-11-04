@@ -143,6 +143,22 @@ docs/                             Design and historical engineering notes
 VERSION                           Current release version
 ```
 
+## Android app
+
+The optional Android app bundles the same controller UI in a full-screen
+WebView and provides a network-pinned WebSocket proxy for the ESP32 access
+point. It requires Android 8.0 (API 26) or newer.
+
+```bash
+cd android-app
+./gradlew assembleRelease
+```
+
+The unsigned APK is written to
+`android-app/app/build/outputs/apk/release/app-release-unsigned.apk`.
+See [`android-app/README.md`](android-app/README.md) for installation,
+permissions, and release-signing guidance.
+
 ## Development checks
 
 Regenerate the embedded web header and check JavaScript syntax before
@@ -155,6 +171,12 @@ arduino-cli compile --fqbn esp32:esp32:esp32 \
   firmware/esp32/ESP3D_Controller
 ```
 
+Build the Android release package as well:
+
+```bash
+(cd android-app && ./gradlew assembleRelease)
+```
+
 Generated build directories are ignored. The embedded `web_ui.h` is committed
 so a checkout contains a directly compilable firmware tree.
 
@@ -163,8 +185,8 @@ so a checkout contains a directly compilable firmware tree.
 Releases use semantic version tags:
 
 ```bash
-git tag -a v1.0.0 -m "ESP3D v1.0.0"
-git push origin v1.0.0
+git tag -a v1.1.0 -m "ESP3D v1.1.0"
+git push origin v1.1.0
 ```
 
 GitHub Actions validates asset generation, JavaScript syntax, and the firmware

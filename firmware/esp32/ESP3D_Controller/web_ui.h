@@ -666,6 +666,10 @@ let lastBleState = null;
 
 
 function socketUrl() {
+  /* Android app shell sets this to its loopback proxy. In a browser the
+     global is absent, so the original host-based URL is used unchanged. */
+  if (window.ESP3D_WS_URL) return window.ESP3D_WS_URL;
+
   const host = location.hostname;
   const local =
     !host || host === 'localhost' || host === '127.0.0.1' || host === '::1';
